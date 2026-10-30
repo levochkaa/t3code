@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema";
-import { type PointerEvent as ReactPointerEvent, useLayoutEffect } from "react";
+import { type PointerEvent as ReactPointerEvent, useLayoutEffect, useState } from "react";
 
 import { useLocalStorage, writeLocalStorageValue } from "./useLocalStorage";
 import { useResizeDrag } from "./useResizeDrag";
@@ -41,10 +41,21 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
 
   // Panels that share a key follow each other's drags, in this tab and in others.
   const [storedWidth] = useLocalStorage(storageKey, defaultWidth, WidthSchema);
-  const clampedWidth = clamp(storedWidth);
+  // Resizing remains usable for this session when browser storage is unavailable.
+  const [unsaved, setUnsaved] = useState<{
+    readonly storageKey: string;
+    readonly storedWidth: number;
+    readonly width: number;
+  } | null>(null);
+  const clampedWidth = clamp(
+    unsaved?.storageKey === storageKey && unsaved.storedWidth === storedWidth
+      ? unsaved.width
+      : storedWidth,
+  );
 
   const commitWidth = (nextStorageKey: string, nextWidth: number) => {
-    writeLocalStorageValue(nextStorageKey, nextWidth, defaultWidth, WidthSchema);
+    const saved = writeLocalStorageValue(nextStorageKey, nextWidth, defaultWidth, WidthSchema);
+    setUnsaved(saved ? null : { storageKey: nextStorageKey, storedWidth, width: nextWidth });
   };
 
   const drag = useResizeDrag<HTMLElement>((event) => {

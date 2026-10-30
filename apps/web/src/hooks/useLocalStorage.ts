@@ -128,7 +128,7 @@ export function writeLocalStorageValue<T, E>(
   value: T | ((val: T) => T),
   initialValue: T,
   schema: Schema.Codec<T, E>,
-): void {
+): boolean {
   try {
     let valueToStore: T;
     if (typeof value === "function") {
@@ -157,8 +157,10 @@ export function writeLocalStorageValue<T, E>(
       setLocalStorageItem(key, valueToStore, schema);
     }
     dispatchLocalStorageChange(key);
+    return true;
   } catch (error) {
     console.error("[LOCALSTORAGE] Could not update stored value.", error);
+    return false;
   }
 }
 
