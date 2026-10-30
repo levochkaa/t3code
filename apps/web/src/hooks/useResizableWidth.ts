@@ -11,6 +11,8 @@ export const RESIZABLE_WIDTH_PROPERTY = "--resizable-width";
 
 export interface UseResizableWidthOptions {
   readonly storageKey: string;
+  /** Saved on every finished drag, and read while `storageKey` has no width of its own. */
+  readonly lastUsedStorageKey?: string | undefined;
   readonly defaultWidth: number;
   readonly minWidth: number;
   readonly maxWidth: number;
@@ -32,7 +34,7 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
   readonly setWidth: (width: number) => void;
   readonly handlers: ResizableWidthHandlers;
 } {
-  const { storageKey, defaultWidth, minWidth, maxWidth, edge } = options;
+  const { storageKey, lastUsedStorageKey, defaultWidth, minWidth, maxWidth, edge } = options;
 
   const clamp = (value: number): number => {
     if (!Number.isFinite(value)) return defaultWidth;
@@ -42,7 +44,11 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
   const readWidth = () => {
     if (typeof window === "undefined") return defaultWidth;
     try {
-      const stored = getLocalStorageItem(storageKey, WidthSchema);
+      const stored =
+        getLocalStorageItem(storageKey, WidthSchema) ??
+        (lastUsedStorageKey === undefined
+          ? null
+          : getLocalStorageItem(lastUsedStorageKey, WidthSchema));
       return clamp(stored ?? defaultWidth);
     } catch (error) {
       console.error("Could not read persisted panel width.", error);
@@ -56,14 +62,18 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
 
   const clampedWidth = clamp(widthState.width);
 
-  const commitWidth = (nextStorageKey: string, nextWidth: number) => {
-    // Resizing remains usable for this session when browser storage is unavailable.
-    setWidthState({ storageKey: nextStorageKey, width: nextWidth });
+  const persistWidth = (nextStorageKey: string, nextWidth: number) => {
     try {
       setLocalStorageItem(nextStorageKey, nextWidth, WidthSchema);
     } catch (error) {
       console.error("Could not persist panel width.", error);
     }
+  };
+
+  const commitWidth = (nextStorageKey: string, nextWidth: number) => {
+    // Resizing remains usable for this session when browser storage is unavailable.
+    setWidthState({ storageKey: nextStorageKey, width: nextWidth });
+    persistWidth(nextStorageKey, nextWidth);
   };
 
   const drag = useResizeDrag<HTMLElement>((event) => {
@@ -82,8 +92,12 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
         host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${nextWidth}px`);
         return nextWidth;
       },
-      finish(finalWidth) {
+      finish(finalWidth, moved) {
         commitWidth(startStorageKey, finalWidth);
+        // A click on the handle chooses nothing, and its width may be clamped to this window.
+        if (moved && lastUsedStorageKey !== undefined) {
+          persistWidth(lastUsedStorageKey, finalWidth);
+        }
       },
       cleanup(committed) {
         host?.style.removeProperty("transition-property");

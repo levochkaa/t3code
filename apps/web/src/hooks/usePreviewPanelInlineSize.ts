@@ -21,6 +21,8 @@ export function usePreviewPanelInlineSize(
   options: {
     readonly enabled?: boolean | undefined;
     readonly widthStorageKey?: string | undefined;
+    /** A `widthStorageKey` with no saved width opens at the width last dragged to. */
+    readonly rememberLastUsedWidth?: boolean | undefined;
     readonly defaultWidth?: number | undefined;
     readonly container?: HTMLElement | null | undefined;
   } = {},
@@ -32,6 +34,7 @@ export function usePreviewPanelInlineSize(
   );
   const { width, handlers } = useResizableWidth({
     storageKey: options.widthStorageKey ?? PREVIEW_PANEL_WIDTH_STORAGE_KEY,
+    lastUsedStorageKey: options.rememberLastUsedWidth ? PREVIEW_PANEL_WIDTH_STORAGE_KEY : undefined,
     defaultWidth: options.defaultWidth ?? PREVIEW_PANEL_DEFAULT_WIDTH,
     minWidth: PREVIEW_PANEL_MIN_WIDTH,
     maxWidth,
