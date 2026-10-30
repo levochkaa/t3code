@@ -11,11 +11,11 @@ interface ResizeSession {
   /** Pointer widths are clamped to these before `resize` sees them. */
   bounds: ResizeBounds;
   resize: (width: number) => number;
-  finish: (width: number, moved: boolean) => void;
+  finish: (width: number, moved: boolean, bounds: ResizeBounds) => void;
   cleanup?: (committed: boolean) => void;
 }
 
-function clampToBounds(width: number, bounds: ResizeBounds): number {
+export function clampToBounds(width: number, bounds: ResizeBounds): number {
   return Math.max(bounds.min, Math.min(bounds.max, width));
 }
 
@@ -60,7 +60,7 @@ function createResizeDrag<T extends HTMLElement>() {
     document.body.style.removeProperty("cursor");
     document.body.style.removeProperty("user-select");
     active.session.cleanup?.(commit);
-    if (commit) active.session.finish(active.width, active.moved);
+    if (commit) active.session.finish(active.width, active.moved, active.session.bounds);
   };
 
   const end = (event: PointerEvent<T>, usePosition: boolean) => {

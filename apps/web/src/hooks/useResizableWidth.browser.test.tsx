@@ -8,13 +8,13 @@ const OTHER_STORAGE_KEY = `${STORAGE_KEY}:other`;
 const FRESH_STORAGE_KEY = `${STORAGE_KEY}:fresh`;
 const LAST_USED_STORAGE_KEY = `${STORAGE_KEY}:last-used`;
 
-function Probe(props: { storageKey?: string }) {
+function Probe(props: { storageKey?: string; maxWidth?: number }) {
   const { width, handlers } = useResizableWidth({
     storageKey: props.storageKey ?? STORAGE_KEY,
     lastUsedStorageKey: LAST_USED_STORAGE_KEY,
     defaultWidth: 400,
     minWidth: 300,
-    maxWidth: 800,
+    maxWidth: props.maxWidth ?? 800,
     edge: "left",
   });
   return (
@@ -97,5 +97,15 @@ describe("useResizableWidth", () => {
     await act(() => dragLeftBy(handle, -2));
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(handle.parentElement?.style.getPropertyValue(RESIZABLE_WIDTH_PROPERTY)).toBe("800px");
+
+    // Bounds that shrink under a held handle must survive the release.
+    const init = { bubbles: true, button: 0, pointerId: 1, clientX: 500 };
+    handle.dispatchEvent(new PointerEvent("pointerdown", init));
+    await screen.rerender(<Probe maxWidth={600} />);
+    await act(() => {
+      handle.dispatchEvent(new PointerEvent("pointerup", init));
+    });
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(handle.parentElement?.style.getPropertyValue(RESIZABLE_WIDTH_PROPERTY)).toBe("600px");
   });
 });

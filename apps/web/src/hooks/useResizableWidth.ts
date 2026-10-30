@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 import { type PointerEvent as ReactPointerEvent, useLayoutEffect, useState } from "react";
 
 import { getLocalStorageItem, setLocalStorageItem } from "./useLocalStorage";
-import { useResizeDrag } from "./useResizeDrag";
+import { clampToBounds, useResizeDrag } from "./useResizeDrag";
 
 const WidthSchema = Schema.Finite;
 
@@ -92,10 +92,11 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
         host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${nextWidth}px`);
         return nextWidth;
       },
-      finish(finalWidth, moved) {
+      finish(finalWidth, moved, bounds) {
         // A click on the handle chooses nothing, and its width may be clamped to this window.
         if (!moved) {
-          host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${startWidth}px`);
+          const currentWidth = clampToBounds(widthState.width, bounds);
+          host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${currentWidth}px`);
           return;
         }
         commitWidth(startStorageKey, finalWidth);
