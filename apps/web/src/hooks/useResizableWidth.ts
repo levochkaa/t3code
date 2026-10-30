@@ -93,9 +93,13 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
         return nextWidth;
       },
       finish(finalWidth, moved) {
-        commitWidth(startStorageKey, finalWidth);
         // A click on the handle chooses nothing, and its width may be clamped to this window.
-        if (moved && lastUsedStorageKey !== undefined) {
+        if (!moved) {
+          host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${startWidth}px`);
+          return;
+        }
+        commitWidth(startStorageKey, finalWidth);
+        if (lastUsedStorageKey !== undefined) {
           persistWidth(lastUsedStorageKey, finalWidth);
         }
       },

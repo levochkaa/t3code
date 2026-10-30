@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { act, render } from "../../test/render";
-import { useResizableWidth } from "./useResizableWidth";
+import { RESIZABLE_WIDTH_PROPERTY, useResizableWidth } from "./useResizableWidth";
 
 const STORAGE_KEY = "t3code:test:resizable-width";
 const OTHER_STORAGE_KEY = `${STORAGE_KEY}:other`;
@@ -74,7 +74,7 @@ describe("useResizableWidth", () => {
     await expect.element(screen.getByText("700")).toBeInTheDocument();
   });
 
-  it("leaves the last used width alone when the handle is only clicked", async () => {
+  it("saves nothing when the handle is only clicked", async () => {
     using _storage = clearStoredWidths();
     // Wider than this window allows, as a width saved on a bigger monitor would be.
     localStorage.setItem(LAST_USED_STORAGE_KEY, "1000");
@@ -88,7 +88,14 @@ describe("useResizableWidth", () => {
     using _capture = vi
       .spyOn(HTMLElement.prototype, "setPointerCapture")
       .mockImplementation(() => {});
-    await act(() => dragLeftBy(screen.getByRole("separator").element(), 0));
+    const handle = screen.getByRole("separator").element();
+    await act(() => dragLeftBy(handle, 0));
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LAST_USED_STORAGE_KEY)).toBe("1000");
+
+    // A nudge under the drag threshold must not leave the panel off by its distance.
+    await act(() => dragLeftBy(handle, -2));
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(handle.parentElement?.style.getPropertyValue(RESIZABLE_WIDTH_PROPERTY)).toBe("800px");
   });
 });
