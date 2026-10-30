@@ -29,6 +29,7 @@ export interface ResizableWidthHandlers {
 /** Persist on drag end to avoid a storage write on every animation frame. */
 export function useResizableWidth(options: UseResizableWidthOptions): {
   readonly width: number;
+  readonly setWidth: (width: number) => void;
   readonly handlers: ResizableWidthHandlers;
 } {
   const { storageKey, defaultWidth, minWidth, maxWidth, edge } = options;
@@ -41,6 +42,10 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
   // Panels that share a key follow each other's drags, in this tab and in others.
   const [storedWidth] = useLocalStorage(storageKey, defaultWidth, WidthSchema);
   const clampedWidth = clamp(storedWidth);
+
+  const commitWidth = (nextStorageKey: string, nextWidth: number) => {
+    writeLocalStorageValue(nextStorageKey, nextWidth, defaultWidth, WidthSchema);
+  };
 
   const drag = useResizeDrag<HTMLElement>((event) => {
     const host = event.currentTarget.parentElement;
@@ -59,7 +64,7 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
         return nextWidth;
       },
       finish(finalWidth) {
-        writeLocalStorageValue(startStorageKey, finalWidth, defaultWidth, WidthSchema);
+        commitWidth(startStorageKey, finalWidth);
       },
       cleanup(committed) {
         host?.style.removeProperty("transition-property");
@@ -76,6 +81,7 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
 
   return {
     width: clampedWidth,
+    setWidth: (value) => commitWidth(storageKey, clamp(value)),
     handlers: {
       ref: drag.ref,
       onPointerDown: drag.onPointerDown,
