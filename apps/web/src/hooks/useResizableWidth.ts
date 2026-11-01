@@ -3,8 +3,10 @@ import { type PointerEvent as ReactPointerEvent, useLayoutEffect, useState } fro
 
 import { useLocalStorage, writeLocalStorageValue } from "./useLocalStorage";
 import { useResizeDrag } from "./useResizeDrag";
+import { useStableCallback } from "./useStableCallback";
 
-const WidthSchema = Schema.Finite;
+// Null while no width is saved, so an unsaved width survives a responsive default changing.
+const StoredWidthSchema = Schema.NullOr(Schema.Finite);
 
 /** The host must size itself from this custom property. */
 export const RESIZABLE_WIDTH_PROPERTY = "--resizable-width";
@@ -26,7 +28,7 @@ export interface ResizableWidthHandlers {
   readonly onLostPointerCapture: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
-/** Persist on drag end to avoid a storage write on every animation frame. */
+/** Uses the current default until a width is chosen; persists on drag end, not every frame. */
 export function useResizableWidth(options: UseResizableWidthOptions): {
   readonly width: number;
   readonly setWidth: (width: number) => void;
@@ -40,21 +42,24 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
   };
 
   // Panels that share a key follow each other's drags, in this tab and in others.
-  const [storedWidth] = useLocalStorage(storageKey, defaultWidth, WidthSchema);
+  const [storedWidth] = useLocalStorage(storageKey, null, StoredWidthSchema);
   // Resizing remains usable for this session when browser storage is unavailable.
   const [unsaved, setUnsaved] = useState<{
     readonly storageKey: string;
-    readonly storedWidth: number;
+    readonly storedWidth: number | null;
     readonly width: number;
   } | null>(null);
   const clampedWidth = clamp(
     unsaved?.storageKey === storageKey && unsaved.storedWidth === storedWidth
       ? unsaved.width
-      : storedWidth,
+      : (storedWidth ?? defaultWidth),
   );
+  const restoreWidth = useStableCallback((host: HTMLElement | null) => {
+    host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${clampedWidth}px`);
+  });
 
   const commitWidth = (nextStorageKey: string, nextWidth: number) => {
-    const saved = writeLocalStorageValue(nextStorageKey, nextWidth, defaultWidth, WidthSchema);
+    const saved = writeLocalStorageValue(nextStorageKey, nextWidth, null, StoredWidthSchema);
     setUnsaved(saved ? null : { storageKey: nextStorageKey, storedWidth, width: nextWidth });
   };
 
@@ -74,8 +79,9 @@ export function useResizableWidth(options: UseResizableWidthOptions): {
         host?.style.setProperty(RESIZABLE_WIDTH_PROPERTY, `${nextWidth}px`);
         return nextWidth;
       },
-      finish(finalWidth) {
-        commitWidth(startStorageKey, finalWidth);
+      finish(finalWidth, moved) {
+        if (moved) commitWidth(startStorageKey, finalWidth);
+        else restoreWidth(host);
       },
       cleanup(committed) {
         host?.style.removeProperty("transition-property");
